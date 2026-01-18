@@ -1,18 +1,24 @@
-import { Entity, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, Unique, Index, DeleteDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, ManyToOne, CreateDateColumn, Unique, Index, DeleteDateColumn, Check, Column, JoinColumn } from 'typeorm';
 import { User } from './user.entity';
 
-@Entity({ name: 'follows' })
-@Unique(['follower', 'following'])
+@Entity('follows')
+@Check(`"followerId" <> "followingId"`)
 export class Follow {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => User, (user) => user.followings, { nullable: false, onDelete: 'CASCADE' })
-  @Index()
+  @Column()
+  followerId: number;
+
+  @Column()
+  followingId: number;
+
+  @ManyToOne(() => User, user => user.followings, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'followerId' })
   follower: User;
 
-  @ManyToOne(() => User, (user) => user.followers, { nullable: false, onDelete: 'CASCADE' })
-  @Index()
+  @ManyToOne(() => User, user => user.followers, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'followingId' })
   following: User;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
