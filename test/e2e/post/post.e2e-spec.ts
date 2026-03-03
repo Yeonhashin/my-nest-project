@@ -5,14 +5,18 @@ import { registerAndLogin } from '../common/fixtures';
 
 describe('Post E2E', () => {
   let app: INestApplication;
-  let token: string;
+  let userAToken: string;
+  let userBToken: string;
   let postId: number;
 
   beforeAll(async () => {
     app = await createTestApp();
 
-    const user = await registerAndLogin(app, 'post@test.com');
-    token = user.token;
+    const userA = await registerAndLogin(app, 'userA@test.com');
+    const userB = await registerAndLogin(app, 'userB@test.com');
+
+    userAToken = userA.token;
+    userBToken = userB.token;
   });
 
   afterAll(async () => {
@@ -22,7 +26,7 @@ describe('Post E2E', () => {
   it('게시글 작성', async () => {
     const res = await request(app.getHttpServer())
       .post('/post')
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userBToken}`)
       .send({ content: '첫 번째 게시글' })
       .expect(201);
 
@@ -35,17 +39,32 @@ describe('Post E2E', () => {
   it('게시글 수정', async () => {
     const res = await request(app.getHttpServer())
       .patch(`/post/${postId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userBToken}`)
       .send({ content: '수정된 게시글' })
       .expect(200);
 
     expect(res.body.content).toBe('수정된 게시글');
   });
 
+  it('작성자가 아닌 유저가 게시글 수정 시도', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/post/${postId}`)
+      .set('Authorization', `Bearer ${userAToken}`)
+      .send({ content: '수정된 게시글' })
+      .expect(403);
+  });
+
+  it('작성자가 아닌 유저가 게시글 삭제 시도', async () => {
+    await request(app.getHttpServer())
+      .delete(`/post/${postId}`)
+      .set('Authorization', `Bearer ${userAToken}`)
+      .expect(403);
+  });
+
   it('게시글 삭제', async () => {
     await request(app.getHttpServer())
       .delete(`/post/${postId}`)
-      .set('Authorization', `Bearer ${token}`)
+      .set('Authorization', `Bearer ${userBToken}`)
       .expect(200);
   });
 

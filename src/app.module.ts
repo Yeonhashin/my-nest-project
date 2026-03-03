@@ -33,7 +33,6 @@ import { SearchModule } from './modules/search/search.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const isTest = config.get('NODE_ENV') === 'test';
-
         return {
           type: 'postgres',
           host: config.get<string>('DB_HOST'),
@@ -46,7 +45,7 @@ import { SearchModule } from './modules/search/search.module';
 
           synchronize: isTest,
           dropSchema: isTest,
-          logging: isTest,
+          logging: false,
         };
       },
     }),

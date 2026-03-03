@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Follow } from 'src/database/entities/follow.entity';
-import { User } from 'src/database/entities/user.entity';
+import { Follow } from '../../database/entities/follow.entity';
+import { User } from '../../database/entities/user.entity';
 import { Repository } from 'typeorm';
 
 @Injectable()

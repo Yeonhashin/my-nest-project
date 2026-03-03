@@ -7,10 +7,7 @@ describe('Comment E2E', () => {
     let app: INestApplication;
 
     let userAToken: string;
-    // let userAId: number;
-
     let userBToken: string;
-    // let userBId: number;
 
     let postId: number;
     let commentId: number;
@@ -22,10 +19,7 @@ describe('Comment E2E', () => {
     const userB = await registerAndLogin(app, 'userB@test.com');
 
     userAToken = userA.token;
-    // userAId = userA.userId;
-
     userBToken = userB.token;
-    // userBId = userB.userId;
 
     const post = await createPost(app, userAToken, 'NestJS 테스트');
     postId = post.id

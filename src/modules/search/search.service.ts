@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Post } from 'src/database/entities/post.entity';
-import { User } from 'src/database/entities/user.entity';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
+
+import { Post } from '../../database/entities/post.entity';
+import { User } from '../../database/entities/user.entity';
+
 import { SearchQueryDto } from './dto/search-query.dto';
 import { PageResponseDto } from 'src/common/dto/page-response.dto';
 import { SearchPostResponseDto } from './dto/search-post.response.dto';
@@ -20,58 +22,88 @@ export class SearchService {
   ) {}
 
   async search(query: SearchQueryDto): Promise<SearchResponseDto> {
-    const { keyword, target, page, limit } = query;
+    const keyword = query.keyword.trim();
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const target = query.target ?? 'all';
 
-    const result: SearchResponseDto = {};
+    const response: SearchResponseDto = {};
 
     if (target === 'post' || target === 'all') {
-      result.posts = await this.searchPosts(keyword, page, limit);
+      response.posts = await this.searchPosts(keyword, page, limit);
     }
 
     if (target === 'user' || target === 'all') {
-      result.users = await this.searchUsers(keyword, page, limit);
+      response.users = await this.searchUsers(keyword, page, limit);
     }
 
-    return result;
+    return response;
   }
+
+  /* =========================
+     POSTS
+  ========================= */
 
   private async searchPosts(
     keyword: string,
     page: number,
     limit: number,
   ): Promise<PageResponseDto<SearchPostResponseDto>> {
-    const qb = this.postRepo.createQueryBuilder('post')
+    const qb = this.postRepo
+      .createQueryBuilder('post')
       .select(['post.id', 'post.content', 'post.createdAt'])
-      .where('post.content ILIKE :keyword', {
+      .where('post.deletedAt IS NULL')
+      .andWhere('post.content ILIKE :keyword', {
         keyword: `%${keyword}%`,
       })
       .orderBy('post.createdAt', 'DESC')
-      .skip((page - 1) * limit)
+      .skip(this.getSkip(page, limit))
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
 
-    return { data, total, page, limit };
+    return this.buildPageResponse(data, total, page, limit);
   }
+
+  /* =========================
+     USERS
+  ========================= */
 
   private async searchUsers(
     keyword: string,
     page: number,
     limit: number,
   ): Promise<PageResponseDto<SearchUserResponseDto>> {
-    const qb = this.userRepo.createQueryBuilder('user')
+    const qb = this.userRepo
+      .createQueryBuilder('user')
       .select(['user.id', 'user.email', 'user.nickname'])
       .where(
         '(user.email ILIKE :kw OR user.nickname ILIKE :kw)',
         { kw: `%${keyword}%` },
       )
       .orderBy('user.id', 'DESC')
-      .skip((page - 1) * limit)
+      .skip(this.getSkip(page, limit))
       .take(limit);
 
     const [data, total] = await qb.getManyAndCount();
 
+    return this.buildPageResponse(data, total, page, limit);
+  }
+
+  /* =========================
+     COMMON
+  ========================= */
+
+  private getSkip(page: number, limit: number): number {
+    return (page - 1) * limit;
+  }
+
+  private buildPageResponse<T>(
+    data: T[],
+    total: number,
+    page: number,
+    limit: number,
+  ): PageResponseDto<T> {
     return { data, total, page, limit };
   }
 }
-

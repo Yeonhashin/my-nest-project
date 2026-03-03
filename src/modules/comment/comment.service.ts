@@ -1,86 +1,122 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+
 import { CreateCommentDto } from './dto/create-comment.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
+
 import { Post } from '../../database/entities/post.entity';
 import { User } from '../../database/entities/user.entity';
 import { Comment } from '../../database/entities/comment.entity';
-import { UpdateCommentDto } from './dto/update-comment.dto';
 
 @Injectable()
 export class CommentService {
-    constructor (
-         @InjectRepository(Post)
-         private readonly postRepo: Repository<Post>,
- 
-         @InjectRepository(User)
-         private readonly userRepo: Repository<User>,
+  constructor(
+    @InjectRepository(Post)
+    private readonly postRepo: Repository<Post>,
 
-         @InjectRepository(Comment)
-         private readonly commentRepo: Repository<Comment>,
-     ) {}   
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
 
-    async create (
-        postId: number, 
-        userId: number, 
-        dto: CreateCommentDto
-    ) {
+    @InjectRepository(Comment)
+    private readonly commentRepo: Repository<Comment>,
+  ) {}
 
-        console.log('[comment-create] postId : '+ postId + ', userId : ' + userId + ', dto : ' + dto);
+  /*
+    =========================
+            CREATE
+    =========================
+  */
 
-        // 게시글이 존재하는지 확인 존재하지 않을 경우 에러 내기 
-        const post = await this.postRepo.findOneBy({ id: postId });
-        if (!post) throw new NotFoundException();
-
-        const user = await this.userRepo.findOneBy({ id: userId });
-        if (!user) throw new NotFoundException('User not found');
-
-        // 작성한 댓글을 댓글 테이블에 삽입 삽입 실패시 에러 내기 
-        const comment = this.commentRepo.create({
-            content: dto.content,
-            post,
-            user,
-        });
-
-        return this.commentRepo.save(comment);    
+  async create(
+    postId: number,
+    userId: number,
+    dto: CreateCommentDto,
+  ): Promise<Comment> {
+    const post = await this.postRepo.findOneBy({ id: postId });
+    if (!post) {
+      throw new NotFoundException('Post not found');
     }
 
-    async update(
-        commentId: number,
-        userId: number,
-        dto: UpdateCommentDto
-    ) {
-
-        console.log('[comment-update] commentId : '+ commentId + ', userId : ' + userId + ', dto : ' + dto);
-
-        const comment = await this.commentRepo.findOne({
-        where: { id: commentId },
-        relations: ['user'],
-        });
-
-        if (!comment) throw new NotFoundException();
-        if (comment.user.id !== userId) throw new ForbiddenException();
-
-        comment.content = dto.content;
-        return this.commentRepo.save(comment);
+    const user = await this.userRepo.findOneBy({ id: userId });
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    async remove(
-        commentId: number, 
-        userId: number
-        ) {
+    const comment = this.commentRepo.create({
+      content: dto.content,
+      post,
+      user,
+    });
 
-        console.log(' [comment-remove] commentId : '+ commentId + ', userId : ' + userId);
+    return this.commentRepo.save(comment);
+  }
 
-        const comment = await this.commentRepo.findOne({
-            where: { id: commentId },
-            relations: ['user'],
-        });
+  /*
+    =========================
+            UPDATE
+    =========================
+  */
 
-        if (!comment) throw new NotFoundException();
-        if (comment.user.id !== userId) throw new ForbiddenException();
+  async update(
+    commentId: number,
+    userId: number,
+    dto: UpdateCommentDto,
+  ): Promise<Comment> {
+    const comment = await this.findCommentWithUser(commentId);
 
-        await this.commentRepo.softRemove(comment);
-        return { success: true };
-        }
+    this.validateOwner(comment, userId);
+
+    comment.content = dto.content;
+
+    return this.commentRepo.save(comment);
+  }
+
+  /*
+    =========================
+            REMOVE
+    =========================
+  */
+
+  async remove(
+    commentId: number,
+    userId: number,
+  ): Promise<{ success: boolean }> {
+    const comment = await this.findCommentWithUser(commentId);
+
+    this.validateOwner(comment, userId);
+
+    await this.commentRepo.softRemove(comment);
+
+    return { success: true };
+  }
+
+  /*
+    =========================
+        PRIVATE METHODS
+    =========================
+  */
+
+  private async findCommentWithUser(commentId: number): Promise<Comment> {
+    const comment = await this.commentRepo.findOne({
+      where: { id: commentId },
+      relations: ['user'],
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    return comment;
+  }
+
+  private validateOwner(comment: Comment, userId: number): void {
+    if (comment.user.id !== userId) {
+      throw new ForbiddenException('You are not the owner of this comment');
+    }
+  }
 }
